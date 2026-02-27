@@ -52,163 +52,186 @@ module.exports = class Discognito {
     }
 
     getSettingsPanel() {
-        const panel = document.createElement("div");
-        panel.style.cssText = "padding: 16px; color: var(--text-normal); background: var(--background-secondary);";
+        const container = document.createElement("div");
+        container.style.cssText = "color: var(--text-normal);";
 
-        const checkboxElements = [];
+        const renderSettings = () => {
+            container.innerHTML = "";
+            const cfg = this.settings.current;
 
-        const createCheckbox = (label, parent, key) => {
-            const div = document.createElement("div");
-            div.style.cssText = "display: flex; justify-content: space-between; margin-bottom: 8px;";
-            const span = document.createElement("span"); span.textContent = label;
-            const input = document.createElement("input"); input.type = "checkbox"; input.checked = parent[key];
-            
-            input.onchange = () => { 
-                parent[key] = input.checked; 
-                
-                this.settings.current.globalPreset = "custom";
-                const selectElement = panel.querySelector("#preset-select");
-                if (selectElement) selectElement.value = "custom"; 
-                
-                this.settings.save(); 
-            };
-            
-            checkboxElements.push({ input, parent, key });
-            div.append(span, input); return div;
-        };
+            // Preset selector
+            const presetSection = document.createElement("div");
+            presetSection.style.cssText = "margin-bottom: 20px;";
 
-        const createSection = (title, configObj, items) => {
-            const sec = document.createElement("div");
-            sec.style.cssText = "margin-bottom: 20px; border: 1px solid var(--background-tertiary); border-radius: 8px; padding: 12px;";
-            const h = document.createElement("div"); h.style.cssText = "font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid var(--background-tertiary); padding-bottom: 6px;"; h.textContent = title;
-            sec.appendChild(h);
-            items.forEach(item => sec.appendChild(createCheckbox(item.label, configObj, item.key)));
-            return sec;
-        };
+            const presetLabel = document.createElement("div");
+            presetLabel.style.cssText = "font-weight: 500; margin-bottom: 8px;";
+            presetLabel.textContent = "Privacy Level Preset";
+            presetSection.appendChild(presetLabel);
 
-        const presetDiv = document.createElement("div");
-        presetDiv.style.cssText = "margin-bottom: 24px; border: 1px solid var(--background-tertiary); border-radius: 8px; padding: 16px;";
-        presetDiv.innerHTML = `<div style="font-weight: 600; margin-bottom: 12px;">Privacy Level Preset</div>`;
-        const select = document.createElement("select");
-        select.id = "preset-select";
-        select.style.cssText = "padding: 8px; border-radius: 4px; border: 1px solid var(--background-tertiary); background: var(--background-primary); color: var(--text-normal); width: 100%; font-weight: 500; cursor: pointer;";
-        
-        const presets = [
-            { value: "basic", label: "Basic" },
-            { value: "advanced", label: "Advanced" },
-            { value: "aggressive", label: "Aggressive" },
-            { value: "custom", label: "Custom" }
-        ];
+            const presetSelect = document.createElement("select");
+            presetSelect.style.cssText = "width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--background-tertiary); background: var(--background-primary); color: var(--text-normal); font-weight: 500; cursor: pointer;";
 
-        presets.forEach(p => {
-            const opt = document.createElement("option"); 
-            opt.value = p.value; 
-            opt.textContent = p.label;
-            if (this.settings.current.globalPreset === p.value) opt.selected = true; 
-            select.appendChild(opt);
-        });
+            const presets = [
+                { value: "basic", label: "Basic" },
+                { value: "advanced", label: "Advanced" },
+                { value: "aggressive", label: "Aggressive" },
+                { value: "custom", label: "Custom" }
+            ];
 
-        select.onchange = () => { 
-            this.settings.applyPreset(select.value); 
-            
-            checkboxElements.forEach(item => {
-                item.input.checked = item.parent[item.key];
+            presets.forEach(p => {
+                const opt = document.createElement("option");
+                opt.value = p.value;
+                opt.textContent = p.label;
+                opt.selected = cfg.globalPreset === p.value;
+                presetSelect.appendChild(opt);
             });
-        };
-        presetDiv.appendChild(select); panel.appendChild(presetDiv);
 
-        const btnContainer = document.createElement("div");
-        btnContainer.style.cssText = "margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--background-tertiary); display: flex; justify-content: flex-end; margin-bottom: 24px;";
+            presetSelect.addEventListener("change", () => {
+                this.settings.applyPreset(presetSelect.value);
+                renderSettings();
+            });
 
-        const applyBtn = document.createElement("button");
-        applyBtn.textContent = "Apply & Restart";
-        applyBtn.style.cssText = "background-color: var(--brand-experiment, #5865f2); color: #fff; border: none; padding: 10px 24px; border-radius: 4px; font-weight: 600; cursor: pointer; transition: background-color 0.2s ease; font-size: 14px;";
-        applyBtn.onmouseover = () => applyBtn.style.backgroundColor = "var(--brand-experiment-560, #4752c4)";
-        applyBtn.onmouseout = () => applyBtn.style.backgroundColor = "var(--brand-experiment, #5865f2)";
+            presetSection.appendChild(presetSelect);
+            container.appendChild(presetSection);
 
-        applyBtn.onclick = () => {
-            this.settings.save();
-            setTimeout(() => {
-                BdApi.Plugins.reload(this.meta.name);
-            }, 800);
-        };
+            // Settings sections
+            const createSection = (title, configObj, items) => {
+                const section = document.createElement("div");
+                section.style.cssText = "margin-bottom: 20px; padding: 12px; border: 1px solid var(--background-tertiary); border-radius: 8px;";
 
-        btnContainer.appendChild(applyBtn);
-        panel.appendChild(btnContainer);
+                const heading = document.createElement("div");
+                heading.style.cssText = "font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid var(--background-tertiary); padding-bottom: 6px;";
+                heading.textContent = title;
+                section.appendChild(heading);
 
-        const cfg = this.settings.current;
-        panel.appendChild(createSection("1. Block Trackers", cfg.blockTracker, [
-            { key: "science",               label: "Block Science/Analytics Events" },
-            { key: "sentry",                label: "Block Sentry Error Reports" },
-            { key: "telemetry",             label: "Block Telemetry (Performance)" },
-            { key: "experiments",           label: "Block A/B Experiments" },
-            { key: "process",               label: "Block Process/Game Monitoring" },
-            { key: "typing",                label: "Block Typing Indicator" },
-            { key: "readReceipts",          label: "Block Read Receipts" },
-            { key: "activity",              label: "Block Activity Status" },
-            { key: "webSocket",             label: "Filter WebSocket Payloads" },
-            { key: "networkDrop",           label: "Hardcore Network Drop (Fetch/XHR Proxy Firewall)" }
-        ]));
-        panel.appendChild(createSection("2. Anti-Fingerprinting", cfg.antiFingerprinting, [
-            { key: "canvas",                label: "Randomize Canvas Pixels" },
-            { key: "font",                  label: "Randomize Font Measurements & Enumerate" },
-            { key: "webgl",                 label: "Spoof WebGL Renderer" },
-            { key: "hardware",              label: "Spoof CPU/RAM Config" },
-            { key: "audio",                 label: "Randomize Audio Context" },
-            { key: "screen",                label: "Spoof Screen Resolution" }
-        ]));
-        panel.appendChild(createSection("3. Identifier Spoofing", cfg.identifierSpoofing, [
-            { key: "machineId",             label: "Spoof Native Machine ID" },
-            { key: "discordNative",         label: "Deep DiscordNative OS Spoofing (Electron)" },
-            { key: "deviceId",              label: "Spoof LocalStorage/IndexedDB Device ID" },
-            { key: "superProperties",       label: "Spoof X-Super-Properties Fetch Headers" },
-            { key: "windowName",            label: "Clear window.name" },
-            { key: "navigator",             label: "Spoof Navigator Properties (Platform, Battery)" },
-            { key: "spoofLocale",           label: "Spoof Locale" },
-            { key: "spoofTimezone",         label: "Spoof Timezone" },
-            { key: "mediaDevices",          label: "Randomize Media Device IDs" },
-            { key: "deviceName",            label: "Spoof Computer Name" }
-        ]));
-        panel.appendChild(createSection("4. Security", cfg.security, [
-            { key: "webRTC",                label: "Force WebRTC Relay & SDP Filter (Hide IP)" },
-            { key: "beacon",                label: "Block Beacon API" },
-            { key: "keyboard",              label: "Add Noise to Keyboard Timestamps" },
-            { key: "randomizeFileName",     label: "Randomize Uploaded File Names" },
-            { key: "stripMetadata",         label: "Strip Image EXIF/Metadata Before Upload" }
-        ]));
-        panel.appendChild(createSection("5. Storage Cleanup & Ghost Mode", cfg.storageCleanup, [
-            { key: "enabled",               label: "Enable Auto-Cleanup" },
-            { key: "cleanupLocalStorage",   label: "Clean LocalStorage Tracking Keys (Every 5 min)" },
-            { key: "cleanupIndexedDB",      label: "Clean IndexedDB Tracking Stores (Every 5 min)" },
-            { key: "nukeOnStartup",         label: "🕵️ Incognito Mode: Nuke cache on startup (Keep token only)" }
-        ]));
+                items.forEach(item => {
+                    const row = document.createElement("div");
+                    row.style.cssText = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;";
 
-        const s = this.identity;
-        const idPanel = document.createElement("div");
-        idPanel.style.cssText = "padding: 16px; background: var(--background-tertiary); border-radius: 8px; font-size: 13px; line-height: 1.6;";
-        idPanel.innerHTML = `
-            <div style="font-weight:600; margin-bottom:12px; color: var(--text-normal);">📊 Current Spoofed Identity</div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                <div>
-                    <div style="color: var(--text-muted); margin-bottom: 4px;">🖥️ Environment</div>
-                    <div>OS: <strong>${s.osProfile.os}</strong></div>
-                    <div>Hardware: <strong>${s.hardwareConcurrency}C / ${s.deviceMemory}GB</strong></div>
-                    <div>Locale: <strong>${s.locale}</strong></div>
-                    <div>Timezone: <strong>${s.timezone.split('/')[1] || s.timezone} (Offset: ${s.timezoneOffset})</strong></div>
-                    <div title="${s.gpu.renderer}">GPU: <strong>${s.gpu.vendor}</strong></div>
+                    const label = document.createElement("label");
+                    label.style.cssText = "cursor: pointer; flex: 1;";
+                    label.textContent = item.label;
+
+                    const checkbox = document.createElement("input");
+                    checkbox.type = "checkbox";
+                    checkbox.checked = configObj[item.key];
+                    checkbox.style.cssText = "cursor: pointer; margin-left: 12px;";
+
+                    checkbox.addEventListener("change", () => {
+                        configObj[item.key] = checkbox.checked;
+                        this.settings.current.globalPreset = "custom";
+                        presetSelect.value = "custom";
+                        this.settings.save();
+                    });
+
+                    row.appendChild(label);
+                    row.appendChild(checkbox);
+                    section.appendChild(row);
+                });
+
+                return section;
+            };
+
+            container.appendChild(createSection("1. Block Trackers", cfg.blockTracker, [
+                { key: "science",               label: "Block Science/Analytics Events" },
+                { key: "sentry",                label: "Block Sentry Error Reports" },
+                { key: "telemetry",             label: "Block Telemetry (Performance)" },
+                { key: "experiments",           label: "Block A/B Experiments" },
+                { key: "process",               label: "Block Process/Game Monitoring" },
+                { key: "typing",                label: "Block Typing Indicator" },
+                { key: "readReceipts",          label: "Block Read Receipts" },
+                { key: "activity",              label: "Block Activity Status" },
+                { key: "webSocket",             label: "Filter WebSocket Payloads" },
+                { key: "networkDrop",           label: "Hardcore Network Drop (Fetch/XHR Proxy Firewall)" }
+            ]));
+            container.appendChild(createSection("2. Anti-Fingerprinting", cfg.antiFingerprinting, [
+                { key: "canvas",                label: "Randomize Canvas Pixels" },
+                { key: "font",                  label: "Randomize Font Measurements & Enumerate" },
+                { key: "webgl",                 label: "Spoof WebGL Renderer" },
+                { key: "hardware",              label: "Spoof CPU/RAM Config" },
+                { key: "audio",                 label: "Randomize Audio Context" },
+                { key: "screen",                label: "Spoof Screen Resolution" }
+            ]));
+            container.appendChild(createSection("3. Identifier Spoofing", cfg.identifierSpoofing, [
+                { key: "machineId",             label: "Spoof Native Machine ID" },
+                { key: "discordNative",         label: "Deep DiscordNative OS Spoofing (Electron)" },
+                { key: "deviceId",              label: "Spoof LocalStorage/IndexedDB Device ID" },
+                { key: "superProperties",       label: "Spoof X-Super-Properties Fetch Headers" },
+                { key: "windowName",            label: "Clear window.name" },
+                { key: "navigator",             label: "Spoof Navigator Properties (Platform, Battery)" },
+                { key: "spoofLocale",           label: "Spoof Locale" },
+                { key: "spoofTimezone",         label: "Spoof Timezone" },
+                { key: "mediaDevices",          label: "Randomize Media Device IDs" },
+                { key: "deviceName",            label: "Spoof Computer Name" }
+            ]));
+            container.appendChild(createSection("4. Security", cfg.security, [
+                { key: "webRTC",                label: "Force WebRTC Relay & SDP Filter (Hide IP)" },
+                { key: "beacon",                label: "Block Beacon API" },
+                { key: "keyboard",              label: "Add Noise to Keyboard Timestamps" },
+                { key: "randomizeFileName",     label: "Randomize Uploaded File Names" },
+                { key: "stripMetadata",         label: "Strip Image EXIF/Metadata Before Upload" }
+            ]));
+            container.appendChild(createSection("5. Storage Cleanup & Ghost Mode", cfg.storageCleanup, [
+                { key: "enabled",               label: "Enable Auto-Cleanup" },
+                { key: "cleanupLocalStorage",   label: "Clean LocalStorage Tracking Keys (Every 5 min)" },
+                { key: "cleanupIndexedDB",      label: "Clean IndexedDB Tracking Stores (Every 5 min)" },
+                { key: "nukeOnStartup",         label: "Incognito Mode: Nuke cache on startup (Keep token only)" }
+            ]));
+
+            // Apply button
+            const btnSection = document.createElement("div");
+            btnSection.style.cssText = "margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--background-tertiary); display: flex; justify-content: flex-end;";
+
+            const applyBtn = document.createElement("button");
+            applyBtn.textContent = "Apply & Restart";
+            applyBtn.style.cssText = "background-color: var(--brand-experiment, #5865f2); color: #fff; border: none; padding: 10px 24px; border-radius: 4px; font-weight: 600; cursor: pointer; transition: background-color 0.2s ease; font-size: 14px;";
+
+            applyBtn.addEventListener("mouseenter", () => {
+                applyBtn.style.backgroundColor = "var(--brand-experiment-560, #4752c4)";
+            });
+            applyBtn.addEventListener("mouseleave", () => {
+                applyBtn.style.backgroundColor = "var(--brand-experiment, #5865f2)";
+            });
+
+            applyBtn.addEventListener("click", () => {
+                this.settings.save();
+                setTimeout(() => {
+                    BdApi.Plugins.reload(this.meta.name);
+                }, 800);
+            });
+
+            btnSection.appendChild(applyBtn);
+            container.appendChild(btnSection);
+
+            // Identity display
+            const s = this.identity;
+            const idPanel = document.createElement("div");
+            idPanel.style.cssText = "margin-top: 24px; padding: 16px; background: var(--background-tertiary); border-radius: 8px; font-size: 13px; line-height: 1.6;";
+            idPanel.innerHTML = `
+                <div style="font-weight:600; margin-bottom:12px; color: var(--text-normal);">Current Spoofed Identity</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div>
+                        <div style="color: var(--text-muted); margin-bottom: 4px;">Environment</div>
+                        <div>OS: <strong>${s.osProfile.os}</strong></div>
+                        <div>Hardware: <strong>${s.hardwareConcurrency}C / ${s.deviceMemory}GB</strong></div>
+                        <div>Locale: <strong>${s.locale}</strong></div>
+                        <div>Timezone: <strong>${s.timezone.split('/')[1] || s.timezone} (Offset: ${s.timezoneOffset})</strong></div>
+                        <div title="${s.gpu.renderer}">GPU: <strong>${s.gpu.vendor}</strong></div>
+                    </div>
+                    <div>
+                        <div style="color: var(--text-muted); margin-bottom: 4px;">Identifiers</div>
+                        <div title="${s.machineGuid}">Machine ID: <strong>${s.machineGuid.split('-')[0]}...</strong></div>
+                        <div title="${s.deviceId}">Device ID: <strong>${s.deviceId.split('-')[0]}...</strong></div>
+                        <div>PC Name: <strong>${s.deviceName}</strong></div>
+                        <div>WebRTC: <strong>Relayed (SDP Cleaned)</strong></div>
+                    </div>
                 </div>
-                <div>
-                    <div style="color: var(--text-muted); margin-bottom: 4px;">🏷️ Identifiers</div>
-                    <div title="${s.machineGuid}">Machine ID: <strong>${s.machineGuid.split('-')[0]}...</strong></div>
-                    <div title="${s.deviceId}">Device ID: <strong>${s.deviceId.split('-')[0]}...</strong></div>
-                    <div>PC Name: <strong>${s.deviceName}</strong></div>
-                    <div>WebRTC: <strong>Relayed (SDP Cleaned)</strong></div>
-                </div>
-            </div>
-        `;
-        panel.appendChild(idPanel);
+            `;
+            container.appendChild(idPanel);
+        };
 
-        return panel;
+        renderSettings();
+        return container;
     }
 };
 
