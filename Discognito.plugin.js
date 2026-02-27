@@ -884,27 +884,46 @@ class SecurityModule {
 
         if (!shouldRandomize && !shouldStripMetadata) return;
 
+        const generateRandomName = (ext) => {
+            return `MDB_${Math.random().toString(36).substring(2, 10)}${ext ? '.' + ext : ''}`;
+        };
+
+        // Patch Discord's _sendMessage to intercept file uploads
+        const w = BdApi.Webpack;
+        const sendMessageModule = w.getByKeys("_sendMessage");
+
+        if (sendMessageModule) {
+            this.tools.patcher.patchNative(sendMessageModule, "_sendMessage", (orig) => function(...args) {
+                if (args[2]?.attachmentsToUpload?.length > 0) {
+                    for (const file of args[2].attachmentsToUpload) {
+                        if (shouldRandomize && file.filename) {
+                            const ext = file.filename.split('.').pop();
+                            file.filename = generateRandomName(ext);
+                        }
+                    }
+                }
+                return orig.apply(this, args);
+            });
+        }
+
+        // Also patch fetch for FormData-based uploads (fallback for other scenarios)
         this.tools.patcher.patchNative(window, "fetch", (orig) => async function (input, init = {}) {
             if (init.body instanceof FormData) {
                 const formData = init.body;
-                const generateRandomName = (ext) => {
-                    return `MDB_${Math.random().toString(36).substring(2, 10)}${ext ? '.' + ext : ''}`;
-                };
-
                 const entries = await Promise.all(
                     Array.from(formData).map(async ([key, value]) => {
                         if (value instanceof File) {
                             let processedFile = value;
+
+                            if (shouldStripMetadata) {
+                                processedFile = await MetadataStripper.strip(processedFile);
+                            }
 
                             if (shouldRandomize) {
                                 const ext = processedFile.name.split('.').pop();
                                 const newName = generateRandomName(ext);
                                 const buffer = await processedFile.arrayBuffer();
                                 processedFile = new File([buffer], newName, { type: processedFile.type });
-                            }
-
-                            if (shouldStripMetadata) {
-                                processedFile = await MetadataStripper.strip(processedFile);
                             }
 
                             return [key, processedFile];
