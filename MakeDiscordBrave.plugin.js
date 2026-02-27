@@ -49,7 +49,6 @@ module.exports = class MakeDiscordBrave {
         this.events.removeAll();
         this.nativePatcher.restoreAll();
         BdApi.Patcher.unpatchAll(this.meta.name);
-        BdApi.UI.showToast("MakeDiscordBrave disabled", { type: "info" });
     }
 
     getSettingsPanel() {
@@ -68,7 +67,8 @@ module.exports = class MakeDiscordBrave {
                 parent[key] = input.checked; 
                 
                 this.settings.current.globalPreset = "custom";
-                select.value = "custom"; 
+                const selectElement = panel.querySelector("#preset-select");
+                if (selectElement) selectElement.value = "custom"; 
                 
                 this.settings.save(); 
             };
@@ -88,7 +88,7 @@ module.exports = class MakeDiscordBrave {
 
         const h2 = document.createElement("h2"); h2.textContent = `MakeDiscordBrave v${this.meta.version}`;
         h2.style.cssText = "margin: 0 0 4px; font-size: 20px; font-weight: 600;";
-        const sub = document.createElement("p"); sub.textContent = "Changes take effect after restarting the plugin.";
+        const sub = document.createElement("p"); sub.textContent = "Changes take effect after clicking 'Apply & Restart'.";
         sub.style.cssText = "color: var(--text-muted); font-size: 13px; margin: 0 0 24px;";
         panel.append(h2, sub);
 
@@ -96,13 +96,14 @@ module.exports = class MakeDiscordBrave {
         presetDiv.style.cssText = "margin-bottom: 24px; border: 1px solid var(--background-tertiary); border-radius: 8px; padding: 16px;";
         presetDiv.innerHTML = `<div style="font-weight: 600; margin-bottom: 12px;">🛡️ Privacy Level Preset</div>`;
         const select = document.createElement("select");
+        select.id = "preset-select";
         select.style.cssText = "padding: 8px; border-radius: 4px; border: 1px solid var(--background-tertiary); background: var(--background-primary); color: var(--text-normal); width: 100%; font-weight: 500; cursor: pointer;";
         
         const presets = [
-            { value: "basic", label: "Basic" },
-            { value: "advanced", label: "Advanced" },
-            { value: "aggressive", label: "Aggressive" },
-            { value: "custom", label: "Custom" }
+            { value: "basic", label: "🟢 Basic (Essential Tracking Protection)" },
+            { value: "advanced", label: "🟡 Advanced (Deep Firewall & Spoofing)" },
+            { value: "aggressive", label: "🔴 Aggressive (Maximum Paranoia Mode)" },
+            { value: "custom", label: "🛠️ Custom (Modified Settings)" }
         ];
 
         presets.forEach(p => {
@@ -123,7 +124,7 @@ module.exports = class MakeDiscordBrave {
         presetDiv.appendChild(select); panel.appendChild(presetDiv);
 
         const btnContainer = document.createElement("div");
-        btnContainer.style.cssText = "margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--background-tertiary); display: flex; justify-content: flex-end;";
+        btnContainer.style.cssText = "margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--background-tertiary); display: flex; justify-content: flex-end; margin-bottom: 24px;";
 
         const applyBtn = document.createElement("button");
         applyBtn.textContent = "Apply & Restart";
@@ -133,8 +134,7 @@ module.exports = class MakeDiscordBrave {
 
         applyBtn.onclick = () => {
             this.settings.save();
-            BdApi.UI.showToast("Settings applied! Restarting plugin...", { type: "success" });
-            
+
             setTimeout(() => {
                 BdApi.Plugins.reload(this.meta.name);
             }, 800);
@@ -181,10 +181,11 @@ module.exports = class MakeDiscordBrave {
             { key: "beacon",                label: "Block Beacon API" },
             { key: "keyboard",              label: "Add Noise to Keyboard Timestamps" }
         ]));
-        panel.appendChild(createSection("5. Storage Cleanup", cfg.storageCleanup, [
+        panel.appendChild(createSection("5. Storage Cleanup & Ghost Mode", cfg.storageCleanup, [
             { key: "enabled",               label: "Enable Auto-Cleanup" },
-            { key: "cleanupLocalStorage",   label: "Clean LocalStorage Tracking Keys" },
-            { key: "cleanupIndexedDB",      label: "Clean IndexedDB Tracking Stores" }
+            { key: "cleanupLocalStorage",   label: "Clean LocalStorage Tracking Keys (Every 5 min)" },
+            { key: "cleanupIndexedDB",      label: "Clean IndexedDB Tracking Stores (Every 5 min)" },
+            { key: "nukeOnStartup",         label: "🕵️ Incognito Mode: Nuke cache on startup (Keep token only)" }
         ]));
 
         const s = this.identity;
@@ -290,13 +291,38 @@ class IdentityManager {
 class SettingsManager {
     constructor(pluginName) {
         this.pluginName = pluginName;
+        
+        this.PRESETS = {
+            basic: {
+                blockTracker: { science: true, analytics: true, telemetry: true, sentry: true, experiments: true, process: false, typing: false, readReceipts: false, activity: false, webSocket: false, networkDrop: false },
+                antiFingerprinting: { canvas: false, audio: false, font: false, webgl: false, hardware: false, screen: false },
+                identifierSpoofing: { machineId: false, discordNative: false, deviceId: false, superProperties: false, navigator: false, windowName: false, deviceName: false, mediaDevices: false, spoofLocale: false, spoofTimezone: false },
+                networkSecurity: { webRTC: false, beacon: false, keyboard: false },
+                storageCleanup: { enabled: false, cleanupLocalStorage: false, cleanupIndexedDB: false, nukeOnStartup: false }
+            },
+            advanced: {
+                blockTracker: { science: true, analytics: true, telemetry: true, sentry: true, experiments: true, process: true, typing: false, readReceipts: false, activity: false, webSocket: true, networkDrop: true },
+                antiFingerprinting: { canvas: true, audio: false, font: true, webgl: true, hardware: true, screen: false },
+                identifierSpoofing: { machineId: true, discordNative: true, deviceId: true, superProperties: true, navigator: true, windowName: true, deviceName: false, mediaDevices: false, spoofLocale: false, spoofTimezone: false },
+                networkSecurity: { webRTC: true, beacon: true, keyboard: false },
+                storageCleanup: { enabled: true, cleanupLocalStorage: true, cleanupIndexedDB: false, nukeOnStartup: false }
+            },
+            aggressive: {
+                blockTracker: { science: true, analytics: true, telemetry: true, sentry: true, experiments: true, process: true, typing: true, readReceipts: true, activity: true, webSocket: true, networkDrop: true },
+                antiFingerprinting: { canvas: true, audio: true, font: true, webgl: true, hardware: true, screen: true },
+                identifierSpoofing: { machineId: true, discordNative: true, deviceId: true, superProperties: true, navigator: true, windowName: true, deviceName: true, mediaDevices: true, spoofLocale: true, spoofTimezone: true },
+                networkSecurity: { webRTC: true, beacon: true, keyboard: true },
+                storageCleanup: { enabled: true, cleanupLocalStorage: true, cleanupIndexedDB: true, nukeOnStartup: true }
+            }
+        };
+
         this.defaultSettings = {
-            globalPreset: "basic",
-            blockTracker: { science: true, analytics: true, telemetry: true, sentry: true, experiments: true, process: false, typing: false, readReceipts: false, activity: false, webSocket: false, networkDrop: false },
-            antiFingerprinting: { canvas: false, audio: false, font: false, webgl: false, hardware: false, screen: false },
-            identifierSpoofing: { machineId: false, discordNative: false, deviceId: false, superProperties: false, navigator: false, windowName: false, deviceName: false, mediaDevices: false, spoofLocale: false, spoofTimezone: false },
-            networkSecurity: { webRTC: false, beacon: false, keyboard: false },
-            storageCleanup: { enabled: false, cleanupLocalStorage: false, cleanupIndexedDB: false, cleanupIntervalMs: 300000  }
+            globalPreset: "advanced",
+            blockTracker: { ...this.PRESETS.advanced.blockTracker },
+            antiFingerprinting: { ...this.PRESETS.advanced.antiFingerprinting },
+            identifierSpoofing: { ...this.PRESETS.advanced.identifierSpoofing },
+            networkSecurity: { ...this.PRESETS.advanced.networkSecurity },
+            storageCleanup: { ...this.PRESETS.advanced.storageCleanup, cleanupIntervalMs: 300000 }
         };
 
         const saved = BdApi.Data.load(this.pluginName, "settings") || {};
@@ -322,61 +348,63 @@ class SettingsManager {
     applyPreset(presetName) {
         this.current.globalPreset = presetName;
 
-        const PRESETS = {
-            basic: {
-                blockTracker: { science: true, analytics: true, telemetry: true, sentry: true, experiments: true, process: false, typing: false, readReceipts: false, activity: false, webSocket: false, networkDrop: false },
-                antiFingerprinting: { canvas: false, audio: false, font: false, webgl: false, hardware: false, screen: false },
-                identifierSpoofing: { machineId: false, discordNative: false, deviceId: false, superProperties: false, navigator: false, windowName: false, deviceName: false, mediaDevices: false, spoofLocale: false, spoofTimezone: false },
-                networkSecurity: { webRTC: false, beacon: false, keyboard: false },
-                storageCleanup: { enabled: false, cleanupLocalStorage: false, cleanupIndexedDB: false }
-            },
-            
-            advanced: {
-                blockTracker: { science: true, analytics: true, telemetry: true, sentry: true, experiments: true, process: true, typing: false, readReceipts: false, activity: false, webSocket: true, networkDrop: true },
-                antiFingerprinting: { canvas: true, audio: false, font: true, webgl: true, hardware: true, screen: false },
-                identifierSpoofing: { machineId: true, discordNative: true, deviceId: true, superProperties: true, navigator: true, windowName: true, deviceName: false, mediaDevices: false, spoofLocale: false, spoofTimezone: false },
-                networkSecurity: { webRTC: true, beacon: true, keyboard: false },
-                storageCleanup: { enabled: true, cleanupLocalStorage: true, cleanupIndexedDB: false }
-            },
-            
-            aggressive: {
-                blockTracker: { science: true, analytics: true, telemetry: true, sentry: true, experiments: true, process: true, typing: true, readReceipts: true, activity: true, webSocket: true, networkDrop: true },
-                antiFingerprinting: { canvas: true, audio: true, font: true, webgl: true, hardware: true, screen: true },
-                identifierSpoofing: { machineId: true, discordNative: true, deviceId: true, superProperties: true, navigator: true, windowName: true, deviceName: true, mediaDevices: true, spoofLocale: true, spoofTimezone: true },
-                networkSecurity: { webRTC: true, beacon: true, keyboard: true },
-                storageCleanup: { enabled: true, cleanupLocalStorage: true, cleanupIndexedDB: true }
-            }
-        };
-
         if (presetName !== "custom") {
-            const targetConfig = PRESETS[presetName];
+            const targetConfig = this.PRESETS[presetName];
             if (targetConfig) {
                 Object.keys(targetConfig).forEach(module => {
                     Object.assign(this.current[module], targetConfig[module]);
                 });
             }
         }
-
         this.save();
     }
 }
 
 class NativePatcher {
     constructor() { this.restorers = []; }
+    
     patchNative(obj, prop, factory) {
         if (!obj || !obj[prop]) return;
         const orig = obj[prop];
         const patched = factory(orig);
+        
         try { Object.defineProperty(patched, "toString", { get: () => orig.toString.bind(orig) }); } catch (e) { }
-        obj[prop] = patched;
-        this.restorers.push(() => { obj[prop] = orig; });
+        
+        try {
+            obj[prop] = patched;
+        } catch (e) {
+            try {
+                Object.defineProperty(obj, prop, { value: patched, configurable: true, writable: true });
+            } catch (e2) {
+                return; 
+            }
+        }
+
+        this.restorers.push(() => {
+            try { 
+                obj[prop] = orig; 
+            } catch (e) {
+                try { Object.defineProperty(obj, prop, { value: orig, configurable: true, writable: true }); } catch (e2) {}
+            }
+        });
     }
+
     patchDescriptor(obj, prop, descriptor) {
         if (!obj) return;
         const orig = Object.getOwnPropertyDescriptor(obj, prop);
-        Object.defineProperty(obj, prop, { configurable: true, ...descriptor });
-        this.restorers.push(() => { if (orig) Object.defineProperty(obj, prop, orig); else { try { delete obj[prop]; } catch (e) { } } });
+        try {
+            Object.defineProperty(obj, prop, { configurable: true, ...descriptor });
+        } catch(e) { return; }
+        
+        this.restorers.push(() => { 
+            if (orig) {
+                try { Object.defineProperty(obj, prop, orig); } catch(e) {} 
+            } else { 
+                try { delete obj[prop]; } catch (e) { } 
+            } 
+        });
     }
+
     restoreAll() {
         for (const restore of [...this.restorers].reverse()) { try { restore(); } catch (e) { } }
         this.restorers = [];
@@ -397,7 +425,6 @@ class EventManager {
     removeAll() { this.listeners = {}; }
 }
 
-// 기능 모듈
 class BlockTrackerModule {
     constructor(tools) { this.tools = tools; }
     
@@ -640,7 +667,7 @@ class IdentifierSpoofingModule {
         };
         
         Object.keys(cfg).filter(key => cfg[key]).forEach(key => handlers[key]?.());
-        this.applyUnifiedNetworkFirewall(); // 통합 방화벽은 별도로 전역 적용
+        this.applyUnifiedNetworkFirewall(); 
     }
 
     patchWindowName() {
@@ -768,20 +795,16 @@ class IdentifierSpoofingModule {
         const settings = this.tools.getSettings();
 
         try {
-            // 원본 객체(Frozen)를 직접 수정하지 않고, 겉옷(Proxy)을 입혀서 우회 스푸핑
             const proxyDn = new Proxy(window.DiscordNative, {
                 get: (target, prop) => {
-                    // 무한 패치 방지 플래그
                     if (prop === "__isPatched") return true;
 
-                    // 1. 머신 ID 스푸핑 가로채기
                     if (prop === "processUtils" && settings.identifierSpoofing.machineId) {
                         return new Proxy(target[prop] || {}, {
                             get: (obj, key) => key === "getRawMachineId" ? () => s.machineGuid : obj[key]
                         });
                     }
 
-                    // 2. C++ 네이티브 OS 정보 가로채기
                     if (prop === "os" && settings.identifierSpoofing.discordNative) {
                         return new Proxy(target[prop] || {}, {
                             get: (obj, key) => {
@@ -796,13 +819,11 @@ class IdentifierSpoofingModule {
                 }
             });
 
-            // window.DiscordNative 전체를 프록시 거울로 교체 (읽기 전용 에러 완벽 회피)
             Object.defineProperty(window, "DiscordNative", {
                 value: proxyDn,
                 configurable: true
             });
         } catch (e) {
-            // 이미 다른 보안 모듈에 의해 최상단이 잠겼을 경우 안전하게 무시
         }
     }
 }
@@ -846,8 +867,23 @@ class NetworkSecurityModule {
     patchKeyboard() {
         const desc = Object.getOwnPropertyDescriptor(Event.prototype, "timeStamp");
         if (desc?.get) {
+            const s = this.tools.session;
             this.tools.patcher.patchDescriptor(Event.prototype, "timeStamp", {
-                get() { const val = desc.get.call(this); return (this.type.startsWith("key")) ? val + this.tools.session.keyboardNoise : val; }
+                get() {
+                    const val = desc.get.call(this);
+                    
+                    // 1. 키보드 이벤트가 아니면 순정 시간 반환
+                    if (!(this instanceof KeyboardEvent)) return val;
+                    
+                    // 2. 디스코드 채팅 엔진이 민감하게 반응하는 '제어 키' 목록
+                    const exemptKeys = ["Enter", "Backspace", "Tab", "Escape", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Shift", "Control", "Alt"];
+                    
+                    // 3. 제어 키를 눌렀을 때는 시스템 에러를 막기 위해 순정 시간 통과
+                    if (exemptKeys.includes(this.key)) return val;
+
+                    // 4. 일반 글자를 타이핑할 때만 소수점 노이즈를 섞어 리듬 트래킹 완벽 교란
+                    return val + s.keyboardNoise;
+                }
             });
         }
     }
@@ -855,8 +891,12 @@ class NetworkSecurityModule {
 
 class StorageCleanupModule {
     constructor(tools) { this.tools = tools; this._interval = null; }
+    
     start(cfg) {
         if (!cfg.enabled) return;
+
+        this.nukeOnStartup(cfg);
+
         const trackingKeys = ["analytics_token", "deviceId", "device_id", "fingerprint", "analytics", "telemetry", "amplitude"];
         const run = async () => {
             if (cfg.cleanupLocalStorage) {
@@ -879,8 +919,26 @@ class StorageCleanupModule {
                 } catch (e) { }
             }
         };
+
         run();
         this._interval = setInterval(run, cfg.cleanupIntervalMs);
     }
+
     stop() { if (this._interval) clearInterval(this._interval); }
+
+    nukeOnStartup(cfg) {
+        if (!cfg.nukeOnStartup) return;
+
+        try {
+            const safeKeys = ["token", "tokens", "MultiAccountStore", "LoginPersistStore"];
+            let nukedCount = 0;
+
+            for (const key of Object.keys(localStorage)) {
+                if (!safeKeys.some(safe => key.includes(safe))) {
+                    localStorage.removeItem(key);
+                    nukedCount++;
+                }
+            }
+        } catch (e) { }
+    }
 }
