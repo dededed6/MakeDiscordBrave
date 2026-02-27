@@ -1,0 +1,51 @@
+# Claude Code
+.claude/
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# Node.js (if using build tools)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Temporary Files
+*.tmp
+*.bak
+*.log
+*.cache
+
+# Development
+.env
+.env.local
+.env.*.local
+*.test.js
+coverage/
+dist/
+build/
+
+# Backup Files
+*.backup
+*.old
+*-backup.*
