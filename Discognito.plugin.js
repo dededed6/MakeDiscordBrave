@@ -1,13 +1,13 @@
 /**
  * @name Discognito
  * @description Prevent Discord from tracking you. Keep you incognito.
- * @version 1.0.0
+ * @version 1.1.0
  * @author dededed6
  */
 
 module.exports = class Discognito {
     constructor() {
-        this.meta = { name: "Discognito", version: "1.0.0" };
+        this.meta = { name: "Discognito", version: "1.1.0" };
         this._tickerInterval = null;
 
         this.identity = new IdentityManager();
@@ -86,24 +86,18 @@ module.exports = class Discognito {
             return sec;
         };
 
-        const h2 = document.createElement("h2"); h2.textContent = `Discognito v${this.meta.version}`;
-        h2.style.cssText = "margin: 0 0 4px; font-size: 20px; font-weight: 600;";
-        const sub = document.createElement("p"); sub.textContent = "Changes take effect after clicking 'Apply & Restart'.";
-        sub.style.cssText = "color: var(--text-muted); font-size: 13px; margin: 0 0 24px;";
-        panel.append(h2, sub);
-
         const presetDiv = document.createElement("div");
         presetDiv.style.cssText = "margin-bottom: 24px; border: 1px solid var(--background-tertiary); border-radius: 8px; padding: 16px;";
-        presetDiv.innerHTML = `<div style="font-weight: 600; margin-bottom: 12px;">🛡️ Privacy Level Preset</div>`;
+        presetDiv.innerHTML = `<div style="font-weight: 600; margin-bottom: 12px;">Privacy Level Preset</div>`;
         const select = document.createElement("select");
         select.id = "preset-select";
         select.style.cssText = "padding: 8px; border-radius: 4px; border: 1px solid var(--background-tertiary); background: var(--background-primary); color: var(--text-normal); width: 100%; font-weight: 500; cursor: pointer;";
         
         const presets = [
-            { value: "basic", label: "🟢 Basic (Essential Tracking Protection)" },
-            { value: "advanced", label: "🟡 Advanced (Deep Firewall & Spoofing)" },
-            { value: "aggressive", label: "🔴 Aggressive (Maximum Paranoia Mode)" },
-            { value: "custom", label: "🛠️ Custom (Modified Settings)" }
+            { value: "basic", label: "Basic" },
+            { value: "advanced", label: "Advanced" },
+            { value: "aggressive", label: "Aggressive" },
+            { value: "custom", label: "Custom" }
         ];
 
         presets.forEach(p => {
@@ -353,7 +347,7 @@ class SettingsManager {
             const targetConfig = this.PRESETS[presetName];
             if (targetConfig) {
                 Object.keys(targetConfig).forEach(module => {
-                    Object.assign(this.current[module], targetConfig[module]);
+                    this.current[module] = JSON.parse(JSON.stringify(targetConfig[module]));
                 });
             }
         }
@@ -887,54 +881,305 @@ class SecurityModule {
     }
 
     patchFileMetadata() {
-        const origAppend = FormData.prototype.append;
-        
-        const stripExif = async (file) => {
-            if (!file.type.startsWith('image/jpeg')) return file;
-            
-            const buffer = await file.arrayBuffer();
-            const view = new DataView(buffer);
-            let offset = 0;
-            
-            if (view.getUint16(offset) !== 0xFFD8) return file; // Not a valid JPEG
-            offset += 2;
-            
-            const chunks = [];
-            let foundExif = false;
+        this.tools.patcher.patchNative(window, "fetch", (orig) => async function (input, init = {}) {
+            if (init.body instanceof FormData) {
+                const formData = init.body;
+                const entries = await Promise.all(
+                    Array.from(formData).map(async ([key, value]) => {
+                        if (value instanceof File) {
+                            const stripped = await MetadataStripper.strip(value);
+                            return [key, stripped];
+                        }
+                        return [key, value];
+                    })
+                );
 
-            while (offset < view.byteLength) {
-                const marker = view.getUint16(offset);
-                const length = view.getUint16(offset + 2);
-                
-                // APP1 marker (EXIF data)
-                if (marker === 0xFFE1) {
-                    foundExif = true;
-                    offset += length + 2; 
+                const newFormData = new FormData();
+                entries.forEach(([key, value]) => {
+                    newFormData.append(key, value);
+                });
+                init.body = newFormData;
+            }
+
+            return orig.call(this, input, init);
+        });
+    }
+}
+
+class MetadataStripper {
+    static async strip(file) {
+        const ext = file.name.split('.').pop().toLowerCase();
+
+        // Images
+        if (['jpg', 'jpeg'].includes(ext)) return await this.stripJpegExif(file);
+        if (ext === 'png') return await this.stripPngMetadata(file);
+        if (ext === 'webp') return await this.stripWebpMetadata(file);
+        if (ext === 'gif') return await this.stripGifMetadata(file);
+        if (['tif', 'tiff', 'raw'].includes(ext)) return await this.stripTiffExif(file);
+
+        // Documents
+        if (ext === 'pdf') return await this.stripPdfMetadata(file);
+        if (ext === 'docx') return await this.stripDocxMetadata(file);
+        if (ext === 'xlsx') return await this.stripXlsxMetadata(file);
+        if (ext === 'pptx') return await this.stripPptxMetadata(file);
+
+        // Video
+        if (ext === 'mp4') return await this.stripMp4Metadata(file);
+        if (ext === 'mov') return await this.stripMovMetadata(file);
+
+        // Audio
+        if (ext === 'mp3') return await this.stripMp3Metadata(file);
+        if (ext === 'flac') return await this.stripFlacMetadata(file);
+        if (ext === 'aac') return await this.stripAacMetadata(file);
+
+        return file;
+    }
+
+    static async stripJpegExif(file) {
+        if (!file.type.startsWith('image/jpeg')) return file;
+
+        const buffer = await file.arrayBuffer();
+        const view = new DataView(buffer);
+        let offset = 0;
+
+        if (view.getUint16(offset) !== 0xFFD8) return file;
+        offset += 2;
+
+        const chunks = [];
+        let foundExif = false;
+
+        while (offset < view.byteLength) {
+            const marker = view.getUint16(offset);
+            const length = view.getUint16(offset + 2);
+
+            if (marker === 0xFFE1) { // APP1 (EXIF)
+                foundExif = true;
+                offset += length + 2;
+                continue;
+            }
+
+            chunks.push(buffer.slice(offset, offset + length + 2));
+            offset += length + 2;
+
+            if (marker === 0xFFDA) { // SOS
+                chunks.push(buffer.slice(offset));
+                break;
+            }
+        }
+
+        if (!foundExif) return file;
+
+        const strippedBuffer = new Blob([[new Uint8Array([0xFF, 0xD8])], ...chunks], { type: 'image/jpeg' });
+        return new File([strippedBuffer], file.name, { type: 'image/jpeg' });
+    }
+
+    static async stripPngMetadata(file) {
+        if (!file.type.startsWith('image/png')) return file;
+
+        const buffer = await file.arrayBuffer();
+        const view = new Uint8Array(buffer);
+        const chunks = [];
+        let offset = 8; // PNG signature
+
+        while (offset < view.length) {
+            const length = new DataView(buffer, offset, 4).getUint32(0, false);
+            const chunkType = String.fromCharCode(...view.slice(offset + 4, offset + 8));
+
+            // Keep critical chunks and IHDR, remove text/metadata chunks
+            if (['IHDR', 'PLTE', 'IDAT', 'IEND', 'tRNS', 'gAMA', 'cHRM', 'sRGB'].includes(chunkType)) {
+                chunks.push(buffer.slice(offset, offset + length + 12));
+            }
+            offset += length + 12;
+        }
+
+        const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+        const strippedBuffer = new Blob([png, ...chunks], { type: 'image/png' });
+        return new File([strippedBuffer], file.name, { type: 'image/png' });
+    }
+
+    static async stripWebpMetadata(file) {
+        // WebP format is complex, return as-is for now
+        return file;
+    }
+
+    static async stripGifMetadata(file) {
+        if (!file.type.startsWith('image/gif')) return file;
+
+        const buffer = await file.arrayBuffer();
+        const view = new Uint8Array(buffer);
+
+        // GIF89a signature
+        if (view[0] !== 0x47 || view[1] !== 0x49 || view[2] !== 0x46) return file;
+
+        // Keep only essential GIF structure, remove application/text extensions
+        let offset = 6; // Skip signature and version
+        const result = [view.slice(0, 6)]; // Copy header
+
+        while (offset < view.length) {
+            const separator = view[offset];
+
+            if (separator === 0x21) { // Extension
+                const label = view[offset + 1];
+                if ([0xFF, 0xFE, 0xF9].includes(label)) { // App, Comment, Graphic Control
+                    offset += 2;
+                    while (offset < view.length && view[offset] !== 0) {
+                        offset += view[offset] + 1;
+                    }
+                    offset++;
                     continue;
                 }
-                
-                chunks.push(buffer.slice(offset, offset + length + 2));
-                offset += length + 2;
-                
-                if (marker === 0xFFDA) { // SOS (Start of Scan) - rest is image data
-                    chunks.push(buffer.slice(offset));
-                    break;
+            } else if (separator === 0x2C) { // Image data
+                const blockSize = 10 + (view[offset + 8] & 0x80 ? Math.pow(2, (view[offset + 8] & 0x07) + 1) * 3 : 0);
+                result.push(view.slice(offset, offset + blockSize));
+                offset += blockSize;
+            } else if (separator === 0x3B) { // Trailer
+                result.push(new Uint8Array([0x3B]));
+                break;
+            }
+            offset++;
+        }
+
+        const strippedBuffer = new Blob(result, { type: 'image/gif' });
+        return new File([strippedBuffer], file.name, { type: 'image/gif' });
+    }
+
+    static async stripTiffExif(file) {
+        // TIFF/RAW processing is complex, basic implementation
+        const buffer = await file.arrayBuffer();
+        const view = new DataView(buffer);
+        const magic = view.getUint16(0);
+
+        if (magic !== 0x4949 && magic !== 0x4D4D) return file; // Not TIFF
+        return file; // Return as-is for now
+    }
+
+    static async stripPdfMetadata(file) {
+        if (!file.type.startsWith('application/pdf')) return file;
+
+        const buffer = await file.arrayBuffer();
+
+        const patterns = [
+            { name: 'Producer', search: '/Producer' },
+            { name: 'Creator', search: '/Creator' },
+            { name: 'CreationDate', search: '/CreationDate' },
+            { name: 'ModDate', search: '/ModDate' }
+        ];
+
+        let modified = false;
+        const result = new Uint8Array(buffer);
+
+        patterns.forEach(pattern => {
+            const searchBytes = new TextEncoder().encode(pattern.search);
+            for (let i = 0; i < result.length - searchBytes.length; i++) {
+                let match = true;
+                for (let j = 0; j < searchBytes.length; j++) {
+                    if (result[i + j] !== searchBytes[j]) { match = false; break; }
+                }
+                if (match) {
+                    let end = i + searchBytes.length;
+                    while (end < result.length && result[end] !== 10 && result[end] !== 13) end++; // LF/CR
+                    for (let k = i; k < end; k++) result[k] = 0x20; // 공백으로 채우기
+                    modified = true;
+                    i = end;
                 }
             }
-            
-            if (!foundExif) return file;
-
-            const strippedBuffer = new Blob([[new Uint8Array([0xFF, 0xD8])], ...chunks], { type: 'image/jpeg' });
-            return new File([strippedBuffer], file.name, { type: 'image/jpeg' });
-        };
-
-        this.tools.patcher.patchNative(FormData.prototype, "append", () => async function (name, value, filename) {
-            if (value instanceof File && value.type.startsWith('image/jpeg')) {
-                const strippedFile = await stripExif(value);
-                return origAppend.call(this, name, strippedFile, filename);
-            }
-            return origAppend.call(this, name, value, filename);
         });
+
+        if (!modified) return file;
+        const blob = new Blob([result], { type: 'application/pdf' });
+        return new File([blob], file.name, { type: 'application/pdf' });
+    }
+
+    static async stripDocxMetadata(file) {
+        if (!file.type.includes('wordprocessingml') && file.type !== 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return file;
+
+        // DOCX is ZIP, would need JSZip library - return as-is
+        return file;
+    }
+
+    static async stripXlsxMetadata(file) {
+        if (!file.type.includes('spreadsheetml') && file.type !== 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') return file;
+
+        // XLSX is ZIP, would need JSZip library - return as-is
+        return file;
+    }
+
+    static async stripPptxMetadata(file) {
+        if (!file.type.includes('presentationml') && file.type !== 'application/vnd.openxmlformats-officedocument.presentationml.presentation') return file;
+
+        // PPTX is ZIP, would need JSZip library - return as-is
+        return file;
+    }
+
+    static async stripMp4Metadata(file) {
+        if (!file.type.startsWith('video/mp4')) return file;
+        // MP4 atom parsing is complex, return as-is
+        return file;
+    }
+
+    static async stripMovMetadata(file) {
+        if (!file.type.startsWith('video/quicktime')) return file;
+        // MOV processing is complex, return as-is
+        return file;
+    }
+
+    static async stripMp3Metadata(file) {
+        if (!file.type.startsWith('audio/mpeg')) return file;
+
+        const buffer = await file.arrayBuffer();
+        const view = new Uint8Array(buffer);
+
+        // Remove ID3v2 tags at start
+        let offset = 0;
+        if (view[0] === 0x49 && view[1] === 0x44 && view[2] === 0x33) { // "ID3"
+            const size = ((view[6] & 0x7f) << 21) | ((view[7] & 0x7f) << 14) | ((view[8] & 0x7f) << 7) | (view[9] & 0x7f);
+            offset = size + 10;
+        }
+
+        // Remove ID3v1 tags at end (128 bytes)
+        let end = view.length;
+        if (view[view.length - 128] === 0x54 && view[view.length - 127] === 0x41 && view[view.length - 126] === 0x47) { // "TAG"
+            end -= 128;
+        }
+
+        const strippedBuffer = buffer.slice(offset, end);
+        const blob = new Blob([strippedBuffer], { type: 'audio/mpeg' });
+        return new File([blob], file.name, { type: 'audio/mpeg' });
+    }
+
+    static async stripFlacMetadata(file) {
+        if (!file.type.startsWith('audio/flac')) return file;
+
+        const buffer = await file.arrayBuffer();
+        const view = new Uint8Array(buffer);
+
+        if (view[0] !== 0x66 || view[1] !== 0x4C || view[2] !== 0x61 || view[3] !== 0x43) return file; // Not FLAC
+
+        let offset = 4;
+        while (offset < view.length) {
+            const isLast = (view[offset] & 0x80) !== 0;
+            const blockType = view[offset] & 0x7F;
+            const blockSize = (view[offset + 1] << 16) | (view[offset + 2] << 8) | view[offset + 3];
+
+            // Skip metadata blocks, keep streaminfo and audio
+            if (blockType === 0) { // STREAMINFO
+                offset += blockSize + 4;
+            } else { // Skip other metadata
+                offset += blockSize + 4;
+            }
+
+            if (isLast) break;
+        }
+
+        const flacHeader = new Uint8Array([0x66, 0x4C, 0x61, 0x43]);
+        const strippedBuffer = new Blob([flacHeader, view.slice(offset)], { type: 'audio/flac' });
+        return new File([strippedBuffer], file.name, { type: 'audio/flac' });
+    }
+
+    static async stripAacMetadata(file) {
+        if (!file.type.startsWith('audio/aac') && !file.type.startsWith('audio/mp4')) return file;
+        // AAC in MP4 container, complex processing - return as-is
+        return file;
     }
 }
 

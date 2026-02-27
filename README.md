@@ -1,5 +1,7 @@
 # Discognito
 
+**v1.1.0**
+
 [English](#english) | [한국어](#korean)
 
 ---
