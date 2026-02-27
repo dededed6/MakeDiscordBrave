@@ -1,4 +1,4 @@
-# MakeDiscordBrave
+# Discognito
 
 [English](#english) | [한국어](#korean)
 
@@ -7,7 +7,7 @@
 <a name="korean"></a>
 ## 🛡️ 소개
 
-MakeDiscordBrave는 Discord 클라이언트에서 다양한 추적 기술을 차단하고 디지털 지문을 스푸핑하여 프라이버시를 강화하는 BetterDiscord 플러그인입니다.
+Discognito는 Discord 클라이언트에서 다양한 추적 기술을 차단하고 디지털 지문을 스푸핑하여 프라이버시를 강화하는 BetterDiscord 플러그인입니다.
 
 ### ✨ 주요 기능
 
@@ -56,7 +56,7 @@ MakeDiscordBrave는 Discord 클라이언트에서 다양한 추적 기술을 차
 ### 📦 설치 방법
 
 1. [BetterDiscord](https://betterdiscord.app/)를 설치합니다.
-2. `MakeDiscordBrave.plugin.js` 파일을 다운로드합니다.
+2. `Discognito.plugin.js` 파일을 다운로드합니다.
 3. BetterDiscord 플러그인 폴더에 파일을 넣습니다:
    - Windows: `%AppData%\BetterDiscord\plugins`
    - Mac: `~/Library/Application Support/BetterDiscord/plugins`
@@ -94,7 +94,7 @@ dededed6
 <a name="english"></a>
 ## 🛡️ Introduction
 
-MakeDiscordBrave is a BetterDiscord plugin that enhances your privacy by blocking various tracking technologies and spoofing digital fingerprints in the Discord client.
+Discognito is a BetterDiscord plugin that enhances your privacy by blocking various tracking technologies and spoofing digital fingerprints in the Discord client.
 
 ### ✨ Features
 
@@ -143,7 +143,7 @@ MakeDiscordBrave is a BetterDiscord plugin that enhances your privacy by blockin
 ### 📦 Installation
 
 1. Install [BetterDiscord](https://betterdiscord.app/).
-2. Download `MakeDiscordBrave.plugin.js` file.
+2. Download `Discognito.plugin.js` file.
 3. Place the file in your BetterDiscord plugins folder:
    - Windows: `%AppData%\BetterDiscord\plugins`
    - Mac: `~/Library/Application Support/BetterDiscord/plugins`

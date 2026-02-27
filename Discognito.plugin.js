@@ -1,13 +1,13 @@
 /**
- * @name MakeDiscordBrave
- * @description Reinforce your privacy by blocking trackers and spoofing fingerprints.
+ * @name Discognito
+ * @description Prevent Discord from tracking you. Keep you incognito.
  * @version 1.0.0
  * @author dededed6
  */
 
-module.exports = class MakeDiscordBrave {
+module.exports = class Discognito {
     constructor() {
-        this.meta = { name: "MakeDiscordBrave", version: "1.0.0" };
+        this.meta = { name: "Discognito", version: "1.0.0" };
         this._tickerInterval = null;
 
         this.identity = new IdentityManager();
@@ -86,7 +86,7 @@ module.exports = class MakeDiscordBrave {
             return sec;
         };
 
-        const h2 = document.createElement("h2"); h2.textContent = `MakeDiscordBrave v${this.meta.version}`;
+        const h2 = document.createElement("h2"); h2.textContent = `${this.meta.name} v${this.meta.version}`;
         h2.style.cssText = "margin: 0 0 4px; font-size: 20px; font-weight: 600;";
         const sub = document.createElement("p"); sub.textContent = "Changes take effect after clicking 'Apply & Restart'.";
         sub.style.cssText = "color: var(--text-muted); font-size: 13px; margin: 0 0 24px;";
