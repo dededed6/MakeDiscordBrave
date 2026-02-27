@@ -173,9 +173,9 @@ module.exports = class Discognito {
             ]));
             container.appendChild(createSection("5. Storage Cleanup & Ghost Mode", cfg.storageCleanup, [
                 { key: "enabled",               label: "Enable Auto-Cleanup" },
-                { key: "cleanupLocalStorage",   label: "Clean LocalStorage Tracking Keys (Every 5 min)" },
-                { key: "cleanupIndexedDB",      label: "Clean IndexedDB Tracking Stores (Every 5 min)" },
-                { key: "nukeOnStartup",         label: "Incognito Mode: Nuke cache on startup (Keep token only)" }
+                { key: "cleanupLocalStorage",   label: "Clean LocalStorage Tracking Keys" },
+                { key: "cleanupIndexedDB",      label: "Clean IndexedDB Tracking Stores" },
+                { key: "nukeOnStartup",         label: "Clean cache on startup" }
             ]));
 
             // Apply button
@@ -207,26 +207,16 @@ module.exports = class Discognito {
             const s = this.identity;
             const idPanel = document.createElement("div");
             idPanel.style.cssText = "margin-top: 24px; padding: 16px; background: var(--background-tertiary); border-radius: 8px; font-size: 13px; line-height: 1.6;";
-            idPanel.innerHTML = `
-                <div style="font-weight:600; margin-bottom:12px; color: var(--text-normal);">Current Spoofed Identity</div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                    <div>
-                        <div style="color: var(--text-muted); margin-bottom: 4px;">Environment</div>
-                        <div>OS: <strong>${s.osProfile.os}</strong></div>
-                        <div>Hardware: <strong>${s.hardwareConcurrency}C / ${s.deviceMemory}GB</strong></div>
-                        <div>Locale: <strong>${s.locale}</strong></div>
-                        <div>Timezone: <strong>${s.timezone.split('/')[1] || s.timezone} (Offset: ${s.timezoneOffset})</strong></div>
-                        <div title="${s.gpu.renderer}">GPU: <strong>${s.gpu.vendor}</strong></div>
-                    </div>
-                    <div>
-                        <div style="color: var(--text-muted); margin-bottom: 4px;">Identifiers</div>
-                        <div title="${s.machineGuid}">Machine ID: <strong>${s.machineGuid.split('-')[0]}...</strong></div>
-                        <div title="${s.deviceId}">Device ID: <strong>${s.deviceId.split('-')[0]}...</strong></div>
-                        <div>PC Name: <strong>${s.deviceName}</strong></div>
-                        <div>WebRTC: <strong>Relayed (SDP Cleaned)</strong></div>
-                    </div>
-                </div>
-            `;
+
+            if (cfg.identifierSpoofing.discordNative) idPanel.innerHTML += `<div>OS: <strong>${s.osProfile.os} (${s.osProfile.os_version})</strong></div>`;
+            if (cfg.identifierSpoofing.hardware) idPanel.innerHTML += `<div>Hardware: <strong>${s.hardwareConcurrency}C / ${s.deviceMemory}GB</strong></div>`;
+            if (cfg.identifierSpoofing.spoofLocale) idPanel.innerHTML += `<div>Locale: <strong>${s.locale}</strong></div>`;
+            if (cfg.identifierSpoofing.spoofTimezone) idPanel.innerHTML += `<div>Timezone: <strong>${s.timezone}</strong> (Offset: ${s.timezoneOffset})</div>`;
+            if (cfg.identifierSpoofing.gpu) idPanel.innerHTML += `<div title="${s.gpu.renderer}">GPU: <strong>${s.gpu.vendor}</strong></div>`;
+            if (cfg.identifierSpoofing.machineId) idPanel.innerHTML += `<div title="${s.machineGuid}">Machine ID: <strong>${s.machineGuid}</strong></div>`;
+            if (cfg.identifierSpoofing.deviceId) idPanel.innerHTML += `<div title="${s.deviceId}">Device ID: <strong>${s.deviceId}</strong></div>`;
+            if (cfg.identifierSpoofing.windowName) idPanel.innerHTML += `<div>PC Name: <strong>${s.deviceName}</strong></div>`;
+
             container.appendChild(idPanel);
         };
 
@@ -906,14 +896,15 @@ class SecurityModule {
                         if (value instanceof File) {
                             let processedFile = value;
 
-                            if (shouldStripMetadata) {
-                                processedFile = await MetadataStripper.strip(processedFile);
-                            }
-
                             if (shouldRandomize) {
                                 const ext = processedFile.name.split('.').pop();
                                 const newName = generateRandomName(ext);
-                                processedFile = new File([await processedFile.arrayBuffer()], newName, { type: processedFile.type });
+                                const buffer = await processedFile.arrayBuffer();
+                                processedFile = new File([buffer], newName, { type: processedFile.type });
+                            }
+
+                            if (shouldStripMetadata) {
+                                processedFile = await MetadataStripper.strip(processedFile);
                             }
 
                             return [key, processedFile];
