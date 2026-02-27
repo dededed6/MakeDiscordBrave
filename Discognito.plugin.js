@@ -171,7 +171,7 @@ module.exports = class Discognito {
                 { key: "randomizeFileName",     label: "Randomize Uploaded File Names" },
                 { key: "stripMetadata",         label: "Strip Image EXIF/Metadata Before Upload" }
             ]));
-            container.appendChild(createSection("5. Storage Cleanup & Ghost Mode", cfg.storageCleanup, [
+            container.appendChild(createSection("5. Storage Cleanup", cfg.storageCleanup, [
                 { key: "enabled",               label: "Enable Auto-Cleanup" },
                 { key: "cleanupLocalStorage",   label: "Clean LocalStorage Tracking Keys" },
                 { key: "cleanupIndexedDB",      label: "Clean IndexedDB Tracking Stores" },

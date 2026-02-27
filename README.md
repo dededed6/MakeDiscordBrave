@@ -45,15 +45,18 @@ Discognito는 Discord 클라이언트에서 다양한 추적 기술을 차단하
 - 🎤 미디어 디바이스 ID 무작위화
 - 💾 컴퓨터 이름 스푸핑
 
-#### 4. 네트워크 보안
+#### 4. 보안
 - 🔒 WebRTC Relay 강제 & SDP 필터 (IP 숨김)
 - 📡 Beacon API 차단
 - ⌨️ 키보드 타임스탬프에 노이즈 추가
+- 📁 업로드 파일 이름 랜덤화
+- 🖼️ 이미지 EXIF/메타데이터 제거
 
 #### 5. 스토리지 정리
 - 🧹 자동 정리 활성화
 - 💾 LocalStorage 추적 키 정리
 - 🗄️ IndexedDB 추적 스토어 정리
+- 🕵️ 시작 시 식별성 캐시 정리
 
 ### 📦 설치 방법
 
@@ -132,15 +135,18 @@ Discognito is a BetterDiscord plugin that enhances your privacy by blocking vari
 - 🎤 Randomize Media Device IDs
 - 💾 Spoof Computer Name
 
-#### 4. Network Security
+#### 4. Security
 - 🔒 Force WebRTC Relay & SDP Filter (Hide IP)
 - 📡 Block Beacon API
 - ⌨️ Add Noise to Keyboard Timestamps
+- 📁 Randomize Uploaded File Names
+- 🖼️ Strip Image EXIF/Metadata
 
 #### 5. Storage Cleanup
 - 🧹 Enable Auto-Cleanup
 - 💾 Clean LocalStorage Tracking Keys
 - 🗄️ Clean IndexedDB Tracking Stores
+- 🕵️ Clean identifying cache on startup
 
 ### 📦 Installation
 
