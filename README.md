@@ -82,8 +82,7 @@ Discognito는 Discord 클라이언트에서 다양한 추적 기술을 차단하
 
 ### ⚠️ 주의사항
 
-- 이 플러그인은 Discord의 일부 기능을 차단합니다. 일부 기능이 정상적으로 작동하지 않을 수 있습니다.
-- Aggressive 모드는 읽음 표시, 타이핑 표시 등을 차단하여 다른 사용자에게 영향을 줄 수 있습니다.
+- 식별자 스푸핑(OS, 머신 ID, Device ID 등) 기능은 효과가 불확실하며, Discord의 이용약관을 위반할 수 있습니다. 이 기능을 사용할 경우 **계정 제한 또는 정지**를 받을 수 있으니 **권장하지 않습니다**. 대신 추적 차단(Block Tracker) 기능만 사용하길 권장합니다.
 - 플러그인 사용은 자기 책임입니다.
 
 ### 📄 라이선스
@@ -172,8 +171,7 @@ Discognito is a BetterDiscord plugin that enhances your privacy by blocking vari
 
 ### ⚠️ Disclaimer
 
-- This plugin blocks some Discord features. Some functionality may not work as expected.
-- Aggressive mode blocks read receipts, typing indicators, etc., which may affect other users.
+- Identifier spoofing features (OS, Machine ID, Device ID, etc.) have uncertain effectiveness and may violate Discord's Terms of Service. Using these features can result in **account restriction or suspension**. We **do not recommend** using them. Instead, we recommend using only the tracking blocking (Block Tracker) features.
 - Use this plugin at your own risk.
 
 ### 📄 License
