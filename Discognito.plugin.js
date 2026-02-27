@@ -839,11 +839,13 @@ class SecurityModule {
         const handlers = {
             beacon: () => this.patchBeacon(),
             webRTC: () => this.patchWebRTC(),
-            keyboard: () => this.patchKeyboard(),
-            randomizeFileName: () => this.patchFileNames(),
-            stripMetadata: () => this.patchFileMetadata()
+            keyboard: () => this.patchKeyboard()
         };
         Object.keys(cfg).filter(key => cfg[key]).forEach(key => handlers[key]?.());
+
+        if (cfg.randomizeFileName || cfg.stripMetadata) {
+            this.patchFileOperations(cfg);
+        }
     }
 
     patchBeacon() {
@@ -886,32 +888,35 @@ class SecurityModule {
         }
     }
 
-    patchFileNames() {
-        const origAppend = FormData.prototype.append;
-        const generateRandomName = (ext) => {
-            return `MDB_${Math.random().toString(36).substring(2, 10)}${ext ? '.' + ext : ''}`;
-        };
+    patchFileOperations(cfg) {
+        const shouldRandomize = cfg.randomizeFileName;
+        const shouldStripMetadata = cfg.stripMetadata;
 
-        this.tools.patcher.patchNative(FormData.prototype, "append", () => function (name, value, filename) {
-            if (value instanceof File) {
-                const ext = value.name.split('.').pop();
-                const newName = generateRandomName(ext);
-                Object.defineProperty(value, 'name', { value: newName, writable: false });
-                if (filename) filename = newName;
-            }
-            return origAppend.call(this, name, value, filename);
-        });
-    }
+        if (!shouldRandomize && !shouldStripMetadata) return;
 
-    patchFileMetadata() {
         this.tools.patcher.patchNative(window, "fetch", (orig) => async function (input, init = {}) {
             if (init.body instanceof FormData) {
                 const formData = init.body;
+                const generateRandomName = (ext) => {
+                    return `MDB_${Math.random().toString(36).substring(2, 10)}${ext ? '.' + ext : ''}`;
+                };
+
                 const entries = await Promise.all(
                     Array.from(formData).map(async ([key, value]) => {
                         if (value instanceof File) {
-                            const stripped = await MetadataStripper.strip(value);
-                            return [key, stripped];
+                            let processedFile = value;
+
+                            if (shouldStripMetadata) {
+                                processedFile = await MetadataStripper.strip(processedFile);
+                            }
+
+                            if (shouldRandomize) {
+                                const ext = processedFile.name.split('.').pop();
+                                const newName = generateRandomName(ext);
+                                processedFile = new File([await processedFile.arrayBuffer()], newName, { type: processedFile.type });
+                            }
+
+                            return [key, processedFile];
                         }
                         return [key, value];
                     })
