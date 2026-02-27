@@ -26,7 +26,7 @@ module.exports = class Discognito {
         this.blockTrackerMod = new BlockTrackerModule(tools);
         this.antiFingerprintingMod = new AntiFingerprintingModule(tools);
         this.identifierSpoofingMod = new IdentifierSpoofingModule(tools);
-        this.networkSecurityMod = new NetworkSecurityModule(tools);
+        this.securityMod = new SecurityModule(tools);
         this.storageCleanupMod = new StorageCleanupModule(tools);
     }
 
@@ -35,7 +35,7 @@ module.exports = class Discognito {
         this.blockTrackerMod.start(cfg.blockTracker);
         this.antiFingerprintingMod.start(cfg.antiFingerprinting);
         this.identifierSpoofingMod.start(cfg.identifierSpoofing);
-        this.networkSecurityMod.start(cfg.networkSecurity);
+        this.securityMod.start(cfg.security);
         this.storageCleanupMod.start(cfg.storageCleanup);
 
         this._tickerInterval = setInterval(() => {
@@ -86,7 +86,7 @@ module.exports = class Discognito {
             return sec;
         };
 
-        const h2 = document.createElement("h2"); h2.textContent = `${this.meta.name} v${this.meta.version}`;
+        const h2 = document.createElement("h2"); h2.textContent = `Discognito v${this.meta.version}`;
         h2.style.cssText = "margin: 0 0 4px; font-size: 20px; font-weight: 600;";
         const sub = document.createElement("p"); sub.textContent = "Changes take effect after clicking 'Apply & Restart'.";
         sub.style.cssText = "color: var(--text-muted); font-size: 13px; margin: 0 0 24px;";
@@ -134,7 +134,6 @@ module.exports = class Discognito {
 
         applyBtn.onclick = () => {
             this.settings.save();
-
             setTimeout(() => {
                 BdApi.Plugins.reload(this.meta.name);
             }, 800);
@@ -176,10 +175,12 @@ module.exports = class Discognito {
             { key: "mediaDevices",          label: "Randomize Media Device IDs" },
             { key: "deviceName",            label: "Spoof Computer Name" }
         ]));
-        panel.appendChild(createSection("4. Network Security", cfg.networkSecurity, [
+        panel.appendChild(createSection("4. Security", cfg.security, [
             { key: "webRTC",                label: "Force WebRTC Relay & SDP Filter (Hide IP)" },
             { key: "beacon",                label: "Block Beacon API" },
-            { key: "keyboard",              label: "Add Noise to Keyboard Timestamps" }
+            { key: "keyboard",              label: "Add Noise to Keyboard Timestamps" },
+            { key: "randomizeFileName",     label: "Randomize Uploaded File Names" },
+            { key: "stripMetadata",         label: "Strip Image EXIF/Metadata Before Upload" }
         ]));
         panel.appendChild(createSection("5. Storage Cleanup & Ghost Mode", cfg.storageCleanup, [
             { key: "enabled",               label: "Enable Auto-Cleanup" },
@@ -297,21 +298,21 @@ class SettingsManager {
                 blockTracker: { science: true, analytics: true, telemetry: true, sentry: true, experiments: true, process: false, typing: false, readReceipts: false, activity: false, webSocket: false, networkDrop: false },
                 antiFingerprinting: { canvas: false, audio: false, font: false, webgl: false, hardware: false, screen: false },
                 identifierSpoofing: { machineId: false, discordNative: false, deviceId: false, superProperties: false, navigator: false, windowName: false, deviceName: false, mediaDevices: false, spoofLocale: false, spoofTimezone: false },
-                networkSecurity: { webRTC: false, beacon: false, keyboard: false },
+                security: { webRTC: false, beacon: false, keyboard: false, randomizeFileName: false, stripMetadata: false },
                 storageCleanup: { enabled: false, cleanupLocalStorage: false, cleanupIndexedDB: false, nukeOnStartup: false }
             },
             advanced: {
                 blockTracker: { science: true, analytics: true, telemetry: true, sentry: true, experiments: true, process: true, typing: false, readReceipts: false, activity: false, webSocket: true, networkDrop: true },
                 antiFingerprinting: { canvas: true, audio: false, font: true, webgl: true, hardware: true, screen: false },
                 identifierSpoofing: { machineId: true, discordNative: true, deviceId: true, superProperties: true, navigator: true, windowName: true, deviceName: false, mediaDevices: false, spoofLocale: false, spoofTimezone: false },
-                networkSecurity: { webRTC: true, beacon: true, keyboard: false },
+                security: { webRTC: true, beacon: true, keyboard: false, randomizeFileName: true, stripMetadata: false },
                 storageCleanup: { enabled: true, cleanupLocalStorage: true, cleanupIndexedDB: false, nukeOnStartup: false }
             },
             aggressive: {
                 blockTracker: { science: true, analytics: true, telemetry: true, sentry: true, experiments: true, process: true, typing: true, readReceipts: true, activity: true, webSocket: true, networkDrop: true },
                 antiFingerprinting: { canvas: true, audio: true, font: true, webgl: true, hardware: true, screen: true },
                 identifierSpoofing: { machineId: true, discordNative: true, deviceId: true, superProperties: true, navigator: true, windowName: true, deviceName: true, mediaDevices: true, spoofLocale: true, spoofTimezone: true },
-                networkSecurity: { webRTC: true, beacon: true, keyboard: true },
+                security: { webRTC: true, beacon: true, keyboard: true, randomizeFileName: true, stripMetadata: true },
                 storageCleanup: { enabled: true, cleanupLocalStorage: true, cleanupIndexedDB: true, nukeOnStartup: true }
             }
         };
@@ -321,7 +322,7 @@ class SettingsManager {
             blockTracker: { ...this.PRESETS.advanced.blockTracker },
             antiFingerprinting: { ...this.PRESETS.advanced.antiFingerprinting },
             identifierSpoofing: { ...this.PRESETS.advanced.identifierSpoofing },
-            networkSecurity: { ...this.PRESETS.advanced.networkSecurity },
+            security: { ...this.PRESETS.advanced.security },
             storageCleanup: { ...this.PRESETS.advanced.storageCleanup, cleanupIntervalMs: 300000 }
         };
 
@@ -621,20 +622,6 @@ class AntiFingerprintingModule {
             const r = orig.call(this, text); const off = fontOffset(this.font || "");
             return new Proxy(r, { get: (t, p) => (p === "width" ? t.width + off : (typeof t[p] === "function" ? t[p].bind(t) : t[p])) });
         });
-        this.tools.patcher.patchNative(Element.prototype, "getBoundingClientRect", (orig) => function () {
-            const r = orig.call(this);
-            return new Proxy(r, { get: (t, p) => (["x", "left", "y", "top", "right", "bottom"].includes(p) ? t[p] + s.rectNoise : (typeof t[p] === "function" ? t[p].bind(t) : t[p])) });
-        });
-        this.tools.patcher.patchNative(Element.prototype, "getClientRects", (orig) => function () {
-            const rects = orig.call(this);
-            return new Proxy(rects, {
-                get: (t, p) => {
-                    if (p === "length") return t.length;
-                    if (!isNaN(p) && t[p]) return new Proxy(t[p], { get: (r, k) => (["x", "left", "y", "top", "right", "bottom"].includes(k) ? r[k] + s.rectNoise : (typeof r[k] === "function" ? r[k].bind(r) : r[k])) });
-                    return typeof t[p] === "function" ? t[p].bind(t) : t[p];
-                }
-            });
-        });
         const ALLOWED = ["Arial", "Helvetica", "Times New Roman", "Courier New", "Verdana", "Georgia", "Trebuchet MS", "Impact"];
         const isAllowed = (font) => ALLOWED.some(a => font.replace(/^\d+px\s*/, "").replace(/['"]/g, "").trim().toLowerCase().includes(a.toLowerCase()));
         if (document.fonts?.check) this.tools.patcher.patchNative(document.fonts, "check", (orig) => function (font) { return isAllowed(font) ? orig.call(this, font) : false; });
@@ -828,14 +815,16 @@ class IdentifierSpoofingModule {
     }
 }
 
-class NetworkSecurityModule {
+class SecurityModule {
     constructor(tools) { this.tools = tools; }
 
     start(cfg) {
         const handlers = {
             beacon: () => this.patchBeacon(),
             webRTC: () => this.patchWebRTC(),
-            keyboard: () => this.patchKeyboard()
+            keyboard: () => this.patchKeyboard(),
+            randomizeFileName: () => this.patchFileNames(),
+            stripMetadata: () => this.patchFileMetadata()
         };
         Object.keys(cfg).filter(key => cfg[key]).forEach(key => handlers[key]?.());
     }
@@ -871,21 +860,81 @@ class NetworkSecurityModule {
             this.tools.patcher.patchDescriptor(Event.prototype, "timeStamp", {
                 get() {
                     const val = desc.get.call(this);
-                    
-                    // 1. 키보드 이벤트가 아니면 순정 시간 반환
                     if (!(this instanceof KeyboardEvent)) return val;
-                    
-                    // 2. 디스코드 채팅 엔진이 민감하게 반응하는 '제어 키' 목록
                     const exemptKeys = ["Enter", "Backspace", "Tab", "Escape", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Shift", "Control", "Alt"];
-                    
-                    // 3. 제어 키를 눌렀을 때는 시스템 에러를 막기 위해 순정 시간 통과
                     if (exemptKeys.includes(this.key)) return val;
-
-                    // 4. 일반 글자를 타이핑할 때만 소수점 노이즈를 섞어 리듬 트래킹 완벽 교란
                     return val + s.keyboardNoise;
                 }
             });
         }
+    }
+
+    patchFileNames() {
+        const origAppend = FormData.prototype.append;
+        const generateRandomName = (ext) => {
+            return `MDB_${Math.random().toString(36).substring(2, 10)}${ext ? '.' + ext : ''}`;
+        };
+
+        this.tools.patcher.patchNative(FormData.prototype, "append", () => function (name, value, filename) {
+            if (value instanceof File) {
+                const ext = value.name.split('.').pop();
+                const newName = generateRandomName(ext);
+                Object.defineProperty(value, 'name', { value: newName, writable: false });
+                if (filename) filename = newName;
+            }
+            return origAppend.call(this, name, value, filename);
+        });
+    }
+
+    patchFileMetadata() {
+        const origAppend = FormData.prototype.append;
+        
+        const stripExif = async (file) => {
+            if (!file.type.startsWith('image/jpeg')) return file;
+            
+            const buffer = await file.arrayBuffer();
+            const view = new DataView(buffer);
+            let offset = 0;
+            
+            if (view.getUint16(offset) !== 0xFFD8) return file; // Not a valid JPEG
+            offset += 2;
+            
+            const chunks = [];
+            let foundExif = false;
+
+            while (offset < view.byteLength) {
+                const marker = view.getUint16(offset);
+                const length = view.getUint16(offset + 2);
+                
+                // APP1 marker (EXIF data)
+                if (marker === 0xFFE1) {
+                    foundExif = true;
+                    offset += length + 2; 
+                    continue;
+                }
+                
+                chunks.push(buffer.slice(offset, offset + length + 2));
+                offset += length + 2;
+                
+                if (marker === 0xFFDA) { // SOS (Start of Scan) - rest is image data
+                    chunks.push(buffer.slice(offset));
+                    break;
+                }
+            }
+            
+            if (!foundExif) return file;
+
+            const strippedBuffer = new Blob([[new Uint8Array([0xFF, 0xD8])], ...chunks], { type: 'image/jpeg' });
+            return new File([strippedBuffer], file.name, { type: 'image/jpeg' });
+        };
+
+        this.tools.patcher.patchNative(FormData.prototype, "append", () => async function (name, value, filename) {
+            if (value instanceof File && value.type.startsWith('image/jpeg')) {
+                const strippedFile = await stripExif(value);
+                return origAppend.call(this, name, strippedFile, filename);
+            }
+            return origAppend.call(this, name, value, filename);
+        });
     }
 }
 
